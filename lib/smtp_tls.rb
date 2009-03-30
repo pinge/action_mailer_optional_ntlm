@@ -1,5 +1,6 @@
 require "openssl"
 require "net/smtp"
+require "net/ntlm"
 
 Net::SMTP.class_eval do
   
@@ -93,4 +94,13 @@ Net::SMTP.class_eval do
     rescue EOFError, OpenSSL::SSL::SSLError
     end
   end
+
+  def auth_ntlm(user, secret)
+    res = critical {
+      line = check_response(get_response('AUTH NTLM %s', Net::NTLM::Message::Type1.new().encode64), true) # send NTLM Type1 Message and receive NTLM Type2 Message
+      get_response(Net::NTLM::Message.decode64(line.split(/ /)[1]).response({:user => user, :password => secret}, {:ntlmv2 => true}).encode64) # send NTLM Type3 Message
+    }
+    raise SMTPAuthenticationError, res unless /\A2../ === res
+  end
+
 end
